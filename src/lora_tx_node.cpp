@@ -17,16 +17,15 @@ void setup()
             ;
     }
 
-    Serial.println("[RX] Central receiver ready.");
+    Serial.println("[TX] Receiver ready.");
 }
 
 void loop()
 {
-    if (LoRa.parsePacket())
-    {
-        String msg = "";
-        while (LoRa.available())
-            msg += (char)LoRa.read();
-        Serial.println("Received: " + msg);
-    }
+    String msg = "Hello from TX!";
+    LoRa.beginPacket();
+    LoRa.print(msg);
+    LoRa.endPacket();
+    Serial.println("Sent: " + msg);
+    delay(5000); // Send every 5 seconds
 }
