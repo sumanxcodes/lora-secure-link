@@ -14,13 +14,26 @@ inline String loadDeviceIdFromEEPROM()
             break;
     }
     id[sizeof(id) - 1] = '\0';
-    return String(id);
+    String result = String(id);
+
+    // hadling error if empty or invalid prefix
+    if (result.length() < 4 || !(result.startsWith("TX") || result.startsWith("RX")))
+    {
+        return "INVALID_ID";
+    }
+
+    return result;
 }
 
 inline uint32_t loadSeedFromEEPROM()
 {
     uint32_t seed;
     EEPROM.get(20, seed);
+    // Handling error
+    if (seed == 0 || seed == 0xFFFFFFFF)
+    {
+        return 0; // returns 0 as invalid seed
+    }
     return seed;
 }
 
