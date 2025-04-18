@@ -1,0 +1,12 @@
+# macOS system files
+.DS_Store
+
+# PlatformIO build system
+.pio/
+.vscode/
+*.bin
+*.elf
+*.hex
+
+# Compiled object files
+*.o
