@@ -1,4 +1,4 @@
-# COS60011
+# LoRa Secure Communication
 COS60011 Technology Design Project
 
 # Securing LoRa-Based Networking for Sensor Data Transmission
