@@ -21,8 +21,10 @@ void setup()
     String id = loadDeviceIdFromEEPROM();
     uint32_t seed = loadSeedFromEEPROM();
 
-    Serial.println("Loaded DEVICE_ID: " + id);
-    Serial.println("Loaded Seed: " + String(seed));
+    Serial.println("\n====================================");
+    Serial.println("\tDEVICE_ID: " + id);
+    Serial.println("\tSeed: " + String(seed));
+    Serial.println("====================================\n");
 }
 
 void loop()
