@@ -3,6 +3,7 @@
 #include <LoRa.h>
 #include "LoRaConfig.h"
 #include "LoRaSetup.h"
+#include "EEPROMReader.h"
 
 void setup()
 {
@@ -17,7 +18,11 @@ void setup()
             ;
     }
 
-    Serial.println("[RX] Central receiver ready.");
+    String id = loadDeviceIdFromEEPROM();
+    uint32_t seed = loadSeedFromEEPROM();
+
+    Serial.println("Loaded DEVICE_ID: " + id);
+    Serial.println("Loaded Seed: " + String(seed));
 }
 
 void loop()
