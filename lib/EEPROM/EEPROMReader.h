@@ -17,7 +17,7 @@ inline String loadDeviceIdFromEEPROM()
     String result = String(id);
 
     // hadling error if empty or invalid prefix
-    if (result.length() < 4 || !(result.startsWith("TX") || result.startsWith("RX")))
+    if (result.length() < 4 || !(result.startsWith("TX") || result.startsWith("RX") || result.startsWith("RL")))
     {
         return "INVALID_ID";
     }
