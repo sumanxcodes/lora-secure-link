@@ -61,31 +61,77 @@ Arduino Uno / ESP32 / STM32 (adjust as needed)
 ## 📡 Radio Module
 SX1278 (LoRa) using RadioHead or LoRa.h
 
+## 📡 LoRa Secure Communication with FSM, Diffie-Hellman & Challenge-Response
+
+This project implements a secure peer-to-peer communication system over LoRa using:
+- Finite State Machine (FSM) logic
+- Diffie-Hellman key exchange
+- Challenge-Response authentication
+- Stream cipher encryption
+
+It supports multi-node communication using broadcast and peer-specific messaging, ideal for secure IoT communication.
+
 ---
 
 ## 📁 Project Structure
 ```
-src/
-├── main.cpp                   → Entry point with setup/loop
-├── DH_Exchange.{h,cpp}        → Handles Diffie-Hellman key exchange
-├── NodeManager.{h,cpp}        → Tracks node states and IDs
-├── MessageUtils.{h,cpp}       → Message creation and parsing helpers
-├── Challenge_Response.{h,cpp} → Challenge-response authentication
-└── Message_Handler.{h,cpp}    → Handles encrypted messages
+/src
+  ├── lora_rx_node.cpp       // RX node logic
+  ├── lora_tx_node.cpp       // TX node logic
 
-include/
-└── (same headers)
-
-lib/
-└── (optional shared libraries)
+/lib
+  ├── ChallengeAuth/         // Challenge-response auth
+  ├── DHExchange/            // Diffie-Hellman key exchange
+  ├── Encryption/            // Stream cipher encryption
+  ├── MessageUtils/          // Message creation/parsing
+  ├── NodeManager/           // Peer state tracking
+  ├── EEPROMReader/          // Load device config from EEPROM
+  ├── LoRaConfig/LoRaSetup.h // LoRa setup helpers
 ```
 
 ---
 
-## 🔑 Project Phases
-1. **DH Key Exchange:** Share public keys, compute shared session key  
-2. **Challenge-Response:** Authenticate peers using shared session key  
-3. **Encrypted Messaging:** Secure data transmission using session key
+## 🔐 How It Works
+
+### 1. **Device Startup**
+- Each node reads its ID and seed from EEPROM.
+- A `CLEAR` broadcast resets all peer states.
+
+---
+
+### 2. **Discovery via PING**
+- RX node sends a `PING` to `ALL`.
+- TX nodes respond with `PONG`.
+
+---
+
+### 3. **Diffie-Hellman Key Exchange**
+- Upon receiving `PONG`, RX sends its public key (`PK`).
+- TX responds with its own public key.
+- Both nodes compute the same shared secret (session key) using DH.
+
+---
+
+### 4. **Challenge-Response Authentication**
+- RX sends a random nonce in a `CHAL` message encrypted with the session key.
+- TX decrypts the challenge, re-encrypts it, and sends back a `RESP`.
+- RX verifies the response using the shared key.
+- If valid, both nodes transition to `SECURE_COMM` state.
+
+---
+
+### 5. **Encrypted Communication**
+- TX periodically reads from a light sensor and encrypts the data using a stream cipher (PRNG seeded by the session key + message count).
+- Encrypted messages (`MSG`) are sent to the RX.
+- RX decrypts them using the same PRNG setup.
+
+---
+
+### 6. **ACK and Retry**
+- RX sends `ACK` to confirm secure communication.
+- If `ACK` is not received, TX retries until successful.
+
+---
 
 ---
 
@@ -114,5 +160,22 @@ lib_deps =
 - Two LoRa-enabled nodes with unique `DEVICE_ID`s
 - Serial monitor at 9600 baud
 - Power via USB or battery
+
+## 🛠️ Setup Instructions
+
+1. Flash `lora_rx_node.cpp` to one Arduino (e.g., RX node)
+2. Flash `lora_tx_node.cpp` to another Arduino (e.g., TX node)
+3. Power on both nodes; ensure they share the same frequency and spreading factor
+4. Use Serial Monitor to view status and logs
+
+---
+
+## 📎 Example Message Format
+
+```
+MSG:<sender>:<receiver>:<ttl>:<msgCount>:<payload>
+CHAL:<sender>:<receiver>:<ttl>:<msgCount>:<encryptedNonce>
+RESP:<sender>:<receiver>:<ttl>:<msgCount>:<encryptedResponse>
+```
 
 ---
