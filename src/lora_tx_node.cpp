@@ -7,6 +7,7 @@
 #include "LoRaConfig.h"
 #include "LoRaSetup.h"
 #include "EEPROMReader.h"
+#include "EEPROMWriter.h"
 #include "MessageUtils.h"
 #include "DHExchange.h"
 #include "NodeManager.h"
@@ -18,10 +19,11 @@
 // -------------------------------
 
 String id;
-uint32_t ttl = 3; // TTL value for messages (used in flooding or expiry control)
+uint32_t seed;
+uint32_t ttl = 5; // TTL value for messages (used in flooding or expiry control)
 
 unsigned long lastMessageSent = 0;
-const unsigned long messageInterval = 10000; // 10s between messages
+const unsigned long messageInterval = 20000; // 10s between messages
 
 unsigned long lastAckRetry = 0;
 const unsigned long ackRetryInterval = 5000; // Retry ACKs every 5s
@@ -94,6 +96,40 @@ void setup()
 
 void loop()
 {
+
+    // This allows to receive a serial command from dashboard and read data from eeprom
+    if (Serial.available())
+    {
+        String input = Serial.readStringUntil('\n');
+        input.trim();
+        if (input == "READ_EEPROM")
+        {
+            String id = loadDeviceIdFromEEPROM();
+            uint32_t seed = loadSeedFromEEPROM();
+            Serial.println("ID:" + id + ",SEED:" + String(seed));
+        }
+        else if (input.startsWith("WRITE_INFO:"))
+        {
+            String payload = input.substring(String("WRITE_INFO:").length());
+            int commaIndex = payload.indexOf(',');
+            if (commaIndex > 0)
+            {
+                String deviceId = payload.substring(0, commaIndex);
+                String seedStr = payload.substring(commaIndex + 1);
+                uint32_t seedValue = seedStr.toInt();
+
+                writeDeviceIdToEEPROM(deviceId);
+                writeSeedToEEPROM(seedValue);
+
+                Serial.println("INFO_UPDATED:" + deviceId + "," + String(seedValue));
+            }
+            else
+            {
+                Serial.println("ERROR:Invalid format");
+            }
+        }
+    }
+
     unsigned long now = millis();
 
     // -------------------------------
@@ -137,12 +173,9 @@ void loop()
                 Serial.println("Encrypted Message: " + encryptedPayload);
                 Serial.print("[");
                 Serial.print(currentTime());
-                Serial.print("] 🔐 Sent encrypted message to ");
-                Serial.print(peer.id);
-                Serial.print(" [msgCount=");
-                Serial.print(peer.messageCount - 1);
-                Serial.println("]");
-                        }
+                Serial.print("] 🔐 Sent -> ");
+                Serial.println(msg);
+            }
         }
         lastMessageSent = now;
     }
@@ -188,7 +221,7 @@ void loop()
 
             if (peer->privateKey == 0 || peer->publicKey == 0)
             {
-                peer->privateKey = generatePrivateKey();
+                peer->privateKey = generatePrivateKey(seed);
                 peer->publicKey = generatePublicKey(peer->privateKey);
             }
 
@@ -196,6 +229,12 @@ void loop()
             LoRa.beginPacket();
             LoRa.print(pkMsg);
             LoRa.endPacket();
+
+            Serial.println(" \n======== STEP 4: Tx -> Rx :DH Key Exchange ========");
+            Serial.println("PRIVATE KEY: " + String(peer->privateKey));
+            Serial.println("PUBLIC KEY: " + String(peer->publicKey));
+            Serial.println("[ " + pkMsg + " ] ");
+            Serial.println("=====================================================");
 
             peer->pkSent = true;
             peer->state = PeerState::ACK_PENDING;
@@ -206,6 +245,10 @@ void loop()
             LoRa.print(ackMsg);
             LoRa.endPacket();
 
+            Serial.println(" \n======== Tx -> Rx :Sends Acknowledgement ========");
+            Serial.println("[ " + ackMsg + " ] ");
+            Serial.println("=====================================================");
+
             // Derive shared session key
             if (peer->sharedSessionKey == 0 &&
                 peer->remotePublicKey != 0 &&
@@ -213,6 +256,9 @@ void loop()
                 peer->pkReceived && peer->pkSent)
             {
                 peer->sharedSessionKey = generateSharedKey(peer->remotePublicKey, peer->privateKey);
+                Serial.println(" \n\n======== STEP 6: Tx Generates Shared Session Key ========");
+                Serial.println("SHARED SESSION KEY: " + String(peer->sharedSessionKey));
+                Serial.println("==========================================================");
             }
 
             markPeerAckReceived(peer->id);
@@ -257,7 +303,14 @@ void loop()
         {
             if (msg.receiverId == "ALL" || msg.receiverId == id)
             {
-                Serial.println("⚠️  Received CLEAR from " + msg.senderId + ". Removing peer.");
+                Serial.println("STEP 2: ⚠️  Received CLEAR from " + msg.senderId + ". Removing peer.");
+                Serial.println("[ " +
+                               msg.type + ":" +
+                               msg.senderId + ":" +
+                               msg.receiverId + ":" +
+                               msg.payload +
+                               " ] \n");
+
                 NodeState *peer = findOrCreatePeer(msg.senderId);
                 resetPeer(peer);
             }
@@ -269,28 +322,7 @@ void loop()
         else if (msg.type == "CHAL")
         {
             NodeState *peer = findOrCreatePeer(msg.senderId);
-
-            Serial.println("📥 Raw LoRa Message: " + received);
-            Serial.println("Session Key: " + String(peer->sharedSessionKey));
-            Serial.println("Message Count: " + String(msg.messageCount));
-
-            String decryptedChallenge = decryptString(msg.payload, peer->sharedSessionKey, msg.messageCount);
-            Serial.println("📥 CHAL Decrypted: " + decryptedChallenge);
-
-            // Compute and prepare response
-            uint32_t responseValue = decryptedChallenge.toInt() + 1;
-            String responseStr = String(responseValue);
-
-            peer->messageCount = msg.messageCount + 1;
-
-            String encryptedResponse = encryptString(responseStr, peer->sharedSessionKey, peer->messageCount);
-
-            String respMsg = createMessageWithTTL("RESP", id, peer->id, 3, peer->messageCount, encryptedResponse);
-            LoRa.beginPacket();
-            LoRa.print(respMsg);
-            LoRa.endPacket();
-
-            Serial.println("🔐 Sent RESP to " + peer->id + ": " + responseStr);
+            handleChallengeResponse(peer, msg, id, ttl);
         }
 
         // ---------------------
