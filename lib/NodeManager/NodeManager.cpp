@@ -90,7 +90,6 @@ void printPeerStatus()
         Serial.println("✅ PK Sent: " + String(peer.pkSent ? "Yes" : "No"));
         Serial.println("✅ PK Received: " + String(peer.pkReceived ? "Yes" : "No"));
         Serial.println("✅ ACK Received: " + String(peer.ackReceived ? "Yes" : "No"));
-        Serial.println("🧠 FSM State: " + String((int)peer.state));
         Serial.println("-----------------------------------");
     }
     Serial.println("===================================\n");
