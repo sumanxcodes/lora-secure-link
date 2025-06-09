@@ -1,6 +1,5 @@
 // ===========================================
-// DHExchange.cpp (Dummy Implementation)
-// For testing: Simulates DH key exchange logic
+// DHExchange.cpp
 // ===========================================
 
 #include "DHExchange.h"
@@ -9,17 +8,32 @@
 #define DH_PRIME 2147483647UL
 #define DH_GENERATOR 5
 
-// Fixed dummy key values for simulation
-static const uint32_t DUMMY_PRIVATE_KEY = 123456;
-static const uint32_t DUMMY_PUBLIC_KEY = 654321;
-static const uint32_t DUMMY_SHARED_KEY = 111111;
-
 /**
  * @brief Return a fixed dummy private key
  */
-uint32_t generatePrivateKey()
+uint32_t generatePrivateKey(uint32_t seed)
 {
-    return DUMMY_PRIVATE_KEY;
+    randomSeed(seed);               // Seeding Arduino's PRNG with EEPROM value
+    return random(10000, 99999999); // Generates private key
+}
+
+// Perform modular exponentiation efficiently (base^exp) % mod
+// This is the core operation behind DH public/shared key generation
+uint32_t modexp(uint32_t base, uint32_t exp, uint32_t mod)
+{
+    uint64_t result = 1;
+    uint64_t base64 = base;
+
+    while (exp > 0)
+    {
+        if (exp % 2 == 1)
+            result = (result * base64) % mod;
+
+        base64 = (base64 * base64) % mod;
+        exp = exp / 2;
+    }
+
+    return (uint32_t)result;
 }
 
 /**
@@ -27,8 +41,7 @@ uint32_t generatePrivateKey()
  */
 uint32_t generatePublicKey(uint32_t privateKey)
 {
-    (void)privateKey; // unused
-    return DUMMY_PUBLIC_KEY;
+    return modexp(DH_GENERATOR, privateKey, DH_PRIME);
 }
 
 /**
@@ -36,7 +49,5 @@ uint32_t generatePublicKey(uint32_t privateKey)
  */
 uint32_t generateSharedKey(uint32_t remotePublicKey, uint32_t privateKey)
 {
-    (void)remotePublicKey; // unused
-    (void)privateKey;      // unused
-    return DUMMY_SHARED_KEY;
+    return modexp(remotePublicKey, privateKey, DH_PRIME);
 }
