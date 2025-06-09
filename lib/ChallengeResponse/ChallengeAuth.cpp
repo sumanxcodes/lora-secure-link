@@ -2,8 +2,10 @@
 
 void handleAuthChallenge(NodeState *peer, const String &selfId, uint32_t ttl)
 {
-    // Static challenge value for simplicity. Replace with `random(1000, 9999)` in production.
-    uint32_t challenge = 11;
+
+    randomSeed(peer->sharedSessionKey + peer->messageCount);
+    uint32_t challenge = random(100000, 999999);
+
     peer->challenge = challenge;
 
     String challengeStr = String(challenge);
@@ -28,7 +30,7 @@ void handleAuthChallenge(NodeState *peer, const String &selfId, uint32_t ttl)
 bool verifyAuthResponse(NodeState *peer, const String &payload, uint32_t messageCount, const String &selfId)
 {
     String decrypted = decryptString(payload, peer->sharedSessionKey, messageCount);
-    uint32_t expected = peer->challenge + 1;
+    uint32_t expected = peer->challenge ^ peer->sharedSessionKey;
 
     Serial.println("📥 RESP Decrypted from " + peer->id + ": " + decrypted);
     Serial.println("Expected response: " + String(expected));
@@ -51,4 +53,31 @@ bool verifyAuthResponse(NodeState *peer, const String &payload, uint32_t message
         resetPeer(peer); // Reset peer state if response was wrong
         return false;
     }
+}
+
+void handleChallengeResponse(NodeState *peer, const LoRaMessage &msg, const String &selfId, uint32_t ttl)
+{
+    // Serial.println("📥 Raw LoRa Message: " + msg);
+    Serial.println("Session Key: " + String(peer->sharedSessionKey));
+    Serial.println("Message Count: " + String(msg.messageCount));
+
+    String decryptedChallenge = decryptString(msg.payload, peer->sharedSessionKey, msg.messageCount);
+    Serial.println("📥 CHAL Decrypted: " + decryptedChallenge);
+
+    // Compute response
+    uint32_t responseValue = decryptedChallenge.toInt() ^ peer->sharedSessionKey;
+    String responseStr = String(responseValue);
+
+    // Advance message counter
+    peer->messageCount = msg.messageCount + 1;
+
+    // Encrypt and send response
+    String encryptedResponse = encryptString(responseStr, peer->sharedSessionKey, peer->messageCount);
+    String respMsg = createMessageWithTTL("RESP", selfId, peer->id, ttl, peer->messageCount, encryptedResponse);
+
+    LoRa.beginPacket();
+    LoRa.print(respMsg);
+    LoRa.endPacket();
+
+    Serial.println("🔐 Sent RESP to " + peer->id + ": " + responseStr);
 }

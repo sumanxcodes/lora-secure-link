@@ -20,4 +20,6 @@ void handleAuthChallenge(NodeState *peer, const String &selfId, uint32_t ttl);
  */
 bool verifyAuthResponse(NodeState *peer, const String &payload, uint32_t messageCount, const String &selfId);
 
+void handleChallengeResponse(NodeState *peer, const LoRaMessage &msg, const String &selfId, uint32_t ttl);
+
 #endif
