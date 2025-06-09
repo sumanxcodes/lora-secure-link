@@ -15,7 +15,7 @@ void handlePing(const LoRaMessage &msg)
  * Handles incoming public key (PK) exchange from peer.
  * Responds with our PK and computes shared session key.
  */
-void handlePkExchange(const LoRaMessage &msg)
+void handlePkExchange(const LoRaMessage &msg, uint32_t seed)
 {
     NodeState *peer = findOrCreatePeer(msg.senderId);
     peer->remotePublicKey = msg.payload.toInt();
@@ -23,8 +23,10 @@ void handlePkExchange(const LoRaMessage &msg)
 
     if (peer->privateKey == 0 || peer->publicKey == 0)
     {
-        peer->privateKey = generatePrivateKey();
+        peer->privateKey = generatePrivateKey(seed);
         peer->publicKey = generatePublicKey(peer->privateKey);
+        Serial.println("PRIVATE KEY: " + String(peer->privateKey));
+        Serial.println("PUBLIC KEY: " + String(peer->publicKey));
     }
 
     if (!peer->pkSent)
@@ -39,7 +41,9 @@ void handlePkExchange(const LoRaMessage &msg)
     if (peer->sharedSessionKey == 0 && peer->privateKey && peer->remotePublicKey)
     {
         peer->sharedSessionKey = generateSharedKey(peer->remotePublicKey, peer->privateKey);
-        Serial.println("✅ Shared session key with " + msg.senderId + ": " + String(peer->sharedSessionKey));
+        Serial.println(" \n\n======== STEP 5: Rx Recieves PK from TX; responds with its ACK message and Generates Shared Session Key ========");
+        Serial.println("SHARED SESSION KEY: " + String(peer->sharedSessionKey));
+        Serial.println("==========================================================");
     }
 
     peer->state = PeerState::ACK_PENDING;
@@ -109,6 +113,6 @@ void handleMsg(const LoRaMessage &msg)
     }
 
     String decrypted = decryptString(msg.payload, peer->sharedSessionKey, msg.messageCount);
-    Serial.println("🔓 [" + String(millis() / 1000) + "] From " + msg.senderId +
-                   " [msg " + String(msg.messageCount) + "]: " + decrypted);
+    Serial.println("🔓 [" + String(millis() / 1000) + "] From -> " + msg.senderId + " : " + msg.receiverId + " : " + msg.ttl + " : " + msg.messageCount + " : " + msg.payload);
+    Serial.println("Decrypted Message: " + decrypted);
 }

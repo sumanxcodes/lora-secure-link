@@ -15,7 +15,7 @@ extern uint32_t ttl;
 
 // Handles individual message types
 void handlePing(const LoRaMessage &msg);
-void handlePkExchange(const LoRaMessage &msg);
+void handlePkExchange(const LoRaMessage &msg, uint32_t seed);
 void handleAck(const LoRaMessage &msg);
 void handleClear(const LoRaMessage &msg);
 void handleMsg(const LoRaMessage &msg);
